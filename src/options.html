@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Keep Focused</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img class="brand-icon" src="../icons/keep_focused_icon.png" alt="" aria-hidden="true">
+          <span class="brand-name">Keep Focused</span>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="Main navigation">
+          <button class="nav-item active" data-view="dashboard" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            Dashboard
+          </button>
+          <button class="nav-item disabled" data-view="insights" type="button" aria-disabled="true" title="Coming soon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"></line>
+              <line x1="12" y1="20" x2="12" y2="4"></line>
+              <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+            Insights
+            <span class="soon-badge">Soon</span>
+          </button>
+          <button class="nav-item" data-view="settings" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            Settings
+          </button>
+        </nav>
+
+        <div class="sidebar-promo">
+          <div class="promo-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
+          <h4>Stay in control</h4>
+          <p>Customize limits and build better habits.</p>
+          <span class="promo-link disabled">View tips <span class="soon-badge">Soon</span></span>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="content">
+          <section id="activeRulesPanel" class="tab-panel active" aria-labelledby="activeRulesTitle">
+            <div class="panel-header">
+              <h2 id="activeRulesTitle">Active today</h2>
+              <div class="date-picker">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                Today
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+            </div>
+            <div id="activeRulesList" class="rules-list"></div>
+
+            <div class="panel-header">
+              <h2 id="statsTitle">Session stats</h2>
+              <div class="date-picker">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span id="statsRange">May 17 – Jun 15</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+            </div>
+            <div id="statsSummary" class="stats-summary"></div>
+            <div id="statsChart" class="stats-chart" aria-label="Past 30 days session chart"></div>
+          </section>
+
+          <section id="addRulesPanel" class="tab-panel" aria-labelledby="editorTitle">
+            <section class="rule-editor" aria-labelledby="editorTitle">
+              <div class="section-heading">
+                <h2 id="editorTitle">Add a rule</h2>
+                <div class="heading-actions">
+                  <button id="cancelEdit" class="ghost hidden" type="button">Cancel edit</button>
+                  <button id="cancelAdd" class="ghost" type="button">Back to settings</button>
+                </div>
+              </div>
+
+              <form id="ruleForm">
+                <label class="field span-2">
+                  <span>Domain</span>
+                  <input id="domainInput" name="domain" type="text" placeholder="domain.com or https://domain.com" autocomplete="off" required>
+                </label>
+
+                <label class="field">
+                  <span>Daily sessions</span>
+                  <input id="limitInput" name="limit" type="number" min="0" max="99" value="5" required>
+                </label>
+
+                <label class="check-row">
+                  <input id="includeSubdomainsInput" type="checkbox" checked>
+                  <span>Include subdomains</span>
+                </label>
+
+                <fieldset class="days span-2">
+                  <legend>Days</legend>
+                  <label><input type="checkbox" name="days" value="Mon" checked> Mon</label>
+                  <label><input type="checkbox" name="days" value="Tue" checked> Tue</label>
+                  <label><input type="checkbox" name="days" value="Wed" checked> Wed</label>
+                  <label><input type="checkbox" name="days" value="Thu" checked> Thu</label>
+                  <label><input type="checkbox" name="days" value="Fri" checked> Fri</label>
+                  <label><input type="checkbox" name="days" value="Sat"> Sat</label>
+                  <label><input type="checkbox" name="days" value="Sun"> Sun</label>
+                </fieldset>
+
+                <fieldset class="time span-2">
+                  <legend>Restricted time</legend>
+                  <label><input type="radio" name="timeMode" value="allDay" checked> All day</label>
+                  <label><input type="radio" name="timeMode" value="custom"> Custom</label>
+                  <div id="customTimes" class="custom-times hidden">
+                    <label>
+                      <span>Start</span>
+                      <input id="startTime" type="time" value="09:00">
+                    </label>
+                    <label>
+                      <span>End</span>
+                      <input id="endTime" type="time" value="17:00">
+                    </label>
+                  </div>
+                </fieldset>
+
+                <p class="hint span-2">Use 0 sessions to fully block the domain during the selected days and time.</p>
+
+                <button id="saveRule" class="primary span-2" type="submit">Add rule</button>
+              </form>
+            </section>
+          </section>
+
+          <section id="allRulesPanel" class="tab-panel" aria-labelledby="allRulesTitle">
+            <div class="panel-header">
+              <h2 id="allRulesTitle">Settings</h2>
+              <button id="addRuleFromRules" class="primary" type="button">Add rule</button>
+            </div>
+
+            <div id="permissionBanner" class="permission-banner hidden" role="alert">
+              <p>Keep Focused needs permission to read page URLs so it can count sessions and block sites.</p>
+              <button id="grantPermission" class="primary" type="button">Grant permission</button>
+            </div>
+
+            <section class="settings-section" aria-labelledby="generalTitle">
+              <h3 id="generalTitle">General</h3>
+              <div class="settings-row">
+                <label class="session-field">
+                  <span>Session window</span>
+                  <input id="sessionWindowInput" type="number" min="1" max="240" step="1">
+                </label>
+                <label class="switch-row">
+                  <span>Blocking enabled</span>
+                  <input id="masterEnabled" type="checkbox">
+                </label>
+              </div>
+            </section>
+
+            <section class="rules-panel" aria-labelledby="savedRulesTitle">
+              <div class="section-heading">
+                <h2 id="savedRulesTitle">Saved rules</h2>
+                <button id="resetUsage" class="ghost" type="button">Reset today</button>
+              </div>
+              <div id="rulesList" class="rules-list"></div>
+            </section>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <template id="emptyTemplate">
+      <div class="empty">
+        <h3>No rules yet</h3>
+        <p>Add a domain, choose the days, and set how many checking sessions you want to allow.</p>
+      </div>
+    </template>
+
+    <script src="options.js"></script>
+  </body>
+</html>

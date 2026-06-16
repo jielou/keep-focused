@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Keep Focused</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="popup-brand">
+          <img src="../icons/keep_focused_icon.png" alt="">
+          <div>
+            <p>Keep Focused</p>
+            <h1 id="statusText">Blocking is on</h1>
+          </div>
+        </div>
+      </header>
+
+      <label class="switch-row">
+        <span>Enable blocking</span>
+        <input id="enabled" type="checkbox">
+      </label>
+
+      <div class="stats">
+        <span id="ruleCount">0 rules</span>
+        <span id="sessionWindow">15 min sessions</span>
+      </div>
+
+      <button id="openOptions" type="button">Open settings</button>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

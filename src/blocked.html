@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blocked by Keep Focused</title>
+    <link rel="stylesheet" href="blocked.css">
+  </head>
+  <body>
+    <main class="block-page">
+      <section class="notice">
+        <div class="brand">
+          <img class="brand-icon" src="../icons/keep_focused_icon.png" alt="" aria-hidden="true">
+          Keep Focused
+        </div>
+
+        <div class="icon-ring" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+          </svg>
+        </div>
+
+        <h1 id="title">This domain is blocked</h1>
+        <p id="message">Your rule is active right now.</p>
+
+        <div class="facts">
+          <span id="domain">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+          </span>
+          <span id="available">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </span>
+        </div>
+
+        <div class="actions">
+          <button id="leaveButton" type="button">Leave site</button>
+          <button id="settingsButton" class="secondary" type="button">Settings</button>
+        </div>
+      </section>
+    </main>
+    <script src="blocked.js"></script>
+  </body>
+</html>
