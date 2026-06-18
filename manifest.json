@@ -3,7 +3,7 @@
   "name": "Keep Focused",
   "description": "Block distracting domains during chosen days and limit daily checking sessions.",
   "version": "0.1.0",
-  "permissions": ["storage", "tabs", "webNavigation"],
+  "permissions": ["storage", "tabs", "webNavigation", "alarms", "notifications"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background.js"

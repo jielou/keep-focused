@@ -28,7 +28,19 @@
         <span id="sessionWindow">15 min sessions</span>
       </div>
 
-      <button id="openOptions" type="button">Open settings</button>
+      <div id="focusPanel" class="focus-panel hidden">
+        <div class="focus-info">
+          <span class="focus-dot" aria-hidden="true"></span>
+          <div>
+            <p class="focus-label">Focused on</p>
+            <p id="focusDomain" class="focus-domain">—</p>
+          </div>
+        </div>
+        <button id="exitFocus" type="button" class="secondary">Exit focus</button>
+      </div>
+
+      <button id="focusCurrent" type="button">Focus current page</button>
+      <button id="openOptions" type="button" class="secondary">Open settings</button>
     </main>
     <script src="popup.js"></script>
   </body>
