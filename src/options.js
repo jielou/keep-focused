@@ -1,7 +1,8 @@
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_SETTINGS = {
   enabled: true,
-  sessionWindowMinutes: 15
+  sessionWindowMinutes: 15,
+  focusDurationMinutes: 30
 };
 
 const PALETTE = [
@@ -31,6 +32,7 @@ const limitInput = document.querySelector("#limitInput");
 const includeSubdomainsInput = document.querySelector("#includeSubdomainsInput");
 const masterEnabled = document.querySelector("#masterEnabled");
 const sessionWindowInput = document.querySelector("#sessionWindowInput");
+const focusDurationInput = document.querySelector("#focusDurationInput");
 const rulesList = document.querySelector("#rulesList");
 const activeRulesList = document.querySelector("#activeRulesList");
 const saveRule = document.querySelector("#saveRule");
@@ -80,6 +82,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     state.settings = { ...DEFAULT_SETTINGS, ...(changes.settings.newValue || {}) };
     masterEnabled.checked = state.settings.enabled;
     sessionWindowInput.value = state.settings.sessionWindowMinutes;
+    focusDurationInput.value = state.settings.focusDurationMinutes;
   }
 
   if (rulesChanged) {
@@ -97,6 +100,7 @@ async function init() {
   state.sessionStats = data.sessionStats || {};
   masterEnabled.checked = state.settings.enabled;
   sessionWindowInput.value = state.settings.sessionWindowMinutes;
+  focusDurationInput.value = state.settings.focusDurationMinutes;
   renderActiveRules();
   renderRules();
   renderStats();
@@ -154,6 +158,16 @@ sessionWindowInput.addEventListener("change", async () => {
   const minutes = Math.max(1, Math.min(240, Number(sessionWindowInput.value) || 15));
   sessionWindowInput.value = minutes;
   state.settings = { ...state.settings, sessionWindowMinutes: minutes };
+  await chrome.storage.local.set({ settings: state.settings });
+});
+
+focusDurationInput.addEventListener("change", async () => {
+  const inputValue = Number(focusDurationInput.value);
+  const minutes = Number.isFinite(inputValue)
+    ? Math.max(1, Math.min(480, inputValue))
+    : DEFAULT_SETTINGS.focusDurationMinutes;
+  focusDurationInput.value = minutes;
+  state.settings = { ...state.settings, focusDurationMinutes: minutes };
   await chrome.storage.local.set({ settings: state.settings });
 });
 

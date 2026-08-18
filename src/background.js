@@ -1,14 +1,17 @@
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DEFAULT_SETTINGS = {
   enabled: true,
-  sessionWindowMinutes: 15
+  sessionWindowMinutes: 15,
+  focusDurationMinutes: 30
 };
 
 chrome.runtime.onInstalled.addListener(async () => {
   const data = await chrome.storage.local.get(["settings", "rules", "usage", "sessionStats", "focus"]);
   const updates = {};
 
-  if (!data.settings) updates.settings = DEFAULT_SETTINGS;
+  if (!data.settings || !Number.isFinite(Number(data.settings.focusDurationMinutes))) {
+    updates.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
+  }
   if (!Array.isArray(data.rules)) updates.rules = [];
   if (!data.usage) updates.usage = {};
   if (!data.sessionStats) updates.sessionStats = {};
@@ -241,39 +244,62 @@ function nextAvailableTime(rule, now, fallback) {
   return endDate.toISOString();
 }
 
-const FOCUS_ALARM_NAME = "keep-focused-alive";
+const FOCUS_END_ALARM_NAME = "keep-focused-end";
 
-async function getFocusState() {
+async function getFocusState({ clearExpired = true } = {}) {
   const data = await chrome.storage.local.get(["focus"]);
-  return data.focus || { active: false };
+  const focus = data.focus || { active: false };
+
+  if (focus.active && Number.isFinite(Number(focus.endsAt)) && Number(focus.endsAt) <= Date.now()) {
+    if (clearExpired) {
+      await chrome.storage.local.set({ focus: { active: false } });
+      return { active: false };
+    }
+  }
+
+  return focus;
 }
 
 async function syncFocusAlarm() {
   const focus = await getFocusState();
-  if (focus.active && focus.tabId) {
-    const existing = await chrome.alarms.get(FOCUS_ALARM_NAME).catch(() => null);
-    if (!existing) {
-      await chrome.alarms.create(FOCUS_ALARM_NAME, { periodInMinutes: 0.25 });
-      console.log("[Keep Focused] focus alarm created");
-    }
+  const endsAt = Number(focus.endsAt);
+
+  if (focus.active && focus.tabId && Number.isFinite(endsAt) && endsAt > Date.now()) {
+    await chrome.alarms.create(FOCUS_END_ALARM_NAME, { when: endsAt });
+    console.log("[Keep Focused] focus-end alarm scheduled", new Date(endsAt).toISOString());
   } else {
-    await chrome.alarms.clear(FOCUS_ALARM_NAME).catch(() => {});
-    console.log("[Keep Focused] focus alarm cleared");
+    await chrome.alarms.clear(FOCUS_END_ALARM_NAME).catch(() => {});
+    console.log("[Keep Focused] focus-end alarm cleared");
   }
 }
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
+chrome.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName !== "local") return;
   if (changes.focus) {
-    syncFocusAlarm();
+    await syncFocusAlarm();
   }
 });
 
-chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === FOCUS_ALARM_NAME) {
-    console.log("[Keep Focused] focus alarm tick");
+chrome.alarms.onAlarm.addListener(async alarm => {
+  if (alarm.name === FOCUS_END_ALARM_NAME) {
+    await expireFocusFromAlarm();
   }
 });
+
+async function expireFocusFromAlarm() {
+  const focus = await getFocusState({ clearExpired: false });
+  if (!focus.active || !Number.isFinite(Number(focus.endsAt)) || Number(focus.endsAt) > Date.now()) {
+    return;
+  }
+
+  await chrome.storage.local.set({ focus: { active: false } });
+  await chrome.notifications.create("focus-complete", {
+    type: "basic",
+    iconUrl: chrome.runtime.getURL("icons/keep_focused_icon_128.png"),
+    title: "Keep Focused",
+    message: "Focus time is complete. You can switch pages again."
+  });
+}
 
 async function evaluateFocusNavigation(tabId, url) {
   const focus = await getFocusState();

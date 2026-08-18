@@ -105,6 +105,43 @@ input[type="checkbox"] {
   font-weight: 700;
 }
 
+.focus-duration-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.duration-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+}
+
+.duration-input-wrap input {
+  width: 70px;
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--ink);
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+}
+
+.duration-input-wrap input:focus {
+  border-color: var(--accent-text);
+  box-shadow: 0 0 0 3px rgba(168, 230, 179, 0.45);
+}
+
 button {
   width: 100%;
   min-height: 42px;
@@ -188,4 +225,17 @@ button.secondary:hover {
   font-size: 15px;
   font-weight: 700;
   word-break: break-all;
+}
+
+.focus-remaining {
+  margin: 4px 0 0;
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-dot {
+    animation: none;
+  }
 }

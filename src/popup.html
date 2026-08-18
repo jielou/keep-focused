@@ -28,12 +28,21 @@
         <span id="sessionWindow">15 min sessions</span>
       </div>
 
+      <label id="focusDurationField" class="focus-duration-field">
+        <span>Focus duration</span>
+        <span class="duration-input-wrap">
+          <input id="focusDuration" type="number" min="1" max="480" step="1" inputmode="numeric" aria-label="Focus duration in minutes">
+          <span>min</span>
+        </span>
+      </label>
+
       <div id="focusPanel" class="focus-panel hidden">
         <div class="focus-info">
           <span class="focus-dot" aria-hidden="true"></span>
           <div>
             <p class="focus-label">Focused on</p>
             <p id="focusDomain" class="focus-domain">—</p>
+            <p id="focusRemaining" class="focus-remaining" aria-live="polite"></p>
           </div>
         </div>
         <button id="exitFocus" type="button" class="secondary">Exit focus</button>

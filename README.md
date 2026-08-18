@@ -46,7 +46,7 @@ Instead of an all-or-nothing blocker, you decide:
 - 🔢 **Session limits** — Set a daily number of checking sessions. Repeated visits inside the same session window only count once.
 - 📊 **Accurate daily totals** — Tracks true daily session counts, including sessions used after resetting today's allowance.
 - ⚡ **Master switch** — Quickly turn all blocking on or off from the popup.
-- 🎯 **Focus mode** — Lock yourself to the current page from the popup. New tabs are blocked and switching to other tabs automatically returns you to the focused page.
+- 🎯 **Timed focus mode** — Lock yourself to the current page for a chosen duration. It defaults to 30 minutes, can be changed in the popup or Settings, and automatically ends even when the popup is closed.
 - 🔒 **Privacy-first** — Everything stays in your browser; no accounts, no servers, no tracking.
 
 ## Showcase
@@ -84,7 +84,7 @@ Keep Focused uses the minimum permissions needed to do its job:
 
 - `storage` — Save your rules and settings locally.
 - `tabs` / `webNavigation` — Detect page navigation and count sessions.
-- `alarms` — Keep the background service worker responsive while Focus mode is active.
+- `alarms` — End a timed Focus mode at its scheduled time, even when the popup is closed.
 - `notifications` — Notify you when Focus mode switches you back to the locked page (fallback when the popup cannot open automatically).
 - `host_permissions: <all_urls>` — Read page URLs so rules can match any domain you choose.
 
