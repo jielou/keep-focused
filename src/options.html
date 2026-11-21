@@ -109,18 +109,38 @@
                   <input id="domainInput" name="domain" type="text" placeholder="domain.com or https://domain.com" autocomplete="off" required>
                 </label>
 
-                <label class="field">
+                <section class="domain-suggestions span-2" aria-labelledby="suggestedDomainsTitle">
+                  <div class="suggestions-heading">
+                    <h3 id="suggestedDomainsTitle">Suggested domains</h3>
+                    <button id="loadDomainSuggestions" class="ghost" type="button">Show most visited · 7 days</button>
+                  </div>
+                  <p id="domainSuggestionsStatus" class="suggestions-note" role="status">Uses Chrome history with your permission. Calculated locally; history is never saved by this extension.</p>
+                  <div id="domainSuggestionsList" class="suggestions-list" role="group" aria-label="Most visited domains in the last 7 days"></div>
+                </section>
+
+                <fieldset class="rule-mode span-2">
+                  <legend>What should happen?</legend>
+                  <label><input type="radio" name="ruleMode" value="block" checked> Completely block</label>
+                  <label><input type="radio" name="ruleMode" value="limit"> Limit daily sessions</label>
+                </fieldset>
+
+                <label id="limitField" class="field span-2 hidden">
                   <span>Daily sessions</span>
-                  <input id="limitInput" name="limit" type="number" min="0" max="99" value="5" required>
+                  <input id="limitInput" name="limit" type="number" min="1" max="99" step="1" value="5" disabled required>
                 </label>
 
-                <label class="check-row">
+                <label class="check-row span-2">
                   <input id="includeSubdomainsInput" type="checkbox" checked>
                   <span>Include subdomains</span>
                 </label>
 
                 <fieldset class="days span-2">
-                  <legend>Days</legend>
+                  <legend>Repeat on</legend>
+                  <div class="day-presets">
+                    <button class="ghost" type="button" data-days="weekdays">Weekdays</button>
+                    <button class="ghost" type="button" data-days="weekends">Weekends</button>
+                    <button class="ghost" type="button" data-days="everyday">Every day</button>
+                  </div>
                   <label><input type="checkbox" name="days" value="Mon" checked> Mon</label>
                   <label><input type="checkbox" name="days" value="Tue" checked> Tue</label>
                   <label><input type="checkbox" name="days" value="Wed" checked> Wed</label>
@@ -132,12 +152,12 @@
 
                 <fieldset class="time span-2">
                   <legend>Restricted time</legend>
-                  <label><input type="radio" name="timeMode" value="allDay" checked> All day</label>
-                  <label><input type="radio" name="timeMode" value="custom"> Custom</label>
-                  <div id="customTimes" class="custom-times hidden">
+                  <label><input type="radio" name="timeMode" value="allDay"> All day</label>
+                  <label><input type="radio" name="timeMode" value="custom" checked> Custom hours</label>
+                  <div id="customTimes" class="custom-times">
                     <label>
                       <span>Start</span>
-                      <input id="startTime" type="time" value="09:00">
+                      <input id="startTime" type="time" value="08:00">
                     </label>
                     <label>
                       <span>End</span>
@@ -146,7 +166,8 @@
                   </div>
                 </fieldset>
 
-                <p class="hint span-2">Use 0 sessions to fully block the domain during the selected days and time.</p>
+                <p class="hint span-2">Uses your computer’s local time. If the end is earlier than the start, the block ends the next day. Add another rule for a different schedule.</p>
+                <p id="scheduleSummary" class="schedule-summary span-2" aria-live="polite"></p>
 
                 <button id="saveRule" class="primary span-2" type="submit">Add rule</button>
               </form>
@@ -182,6 +203,17 @@
               </div>
             </section>
 
+            <section class="settings-section" aria-labelledby="tabLimitTitle">
+              <h3 id="tabLimitTitle">Tab limit</h3>
+              <div class="settings-row">
+                <label class="session-field">
+                  <span>Maximum open tabs</span>
+                  <input id="maxOpenTabsInput" type="number" min="1" max="500" step="1" inputmode="numeric" placeholder="No limit">
+                  <small>Leave blank to allow any number of tabs.</small>
+                </label>
+              </div>
+            </section>
+
             <section class="rules-panel" aria-labelledby="savedRulesTitle">
               <div class="section-heading">
                 <h2 id="savedRulesTitle">Saved rules</h2>
@@ -197,10 +229,12 @@
     <template id="emptyTemplate">
       <div class="empty">
         <h3>No rules yet</h3>
-        <p>Add a domain, choose the days, and set how many checking sessions you want to allow.</p>
+        <p>Add a domain, choose the days and hours, then completely block it or limit daily sessions.</p>
       </div>
     </template>
 
+    <script src="schedule.js"></script>
+    <script src="domain-suggestions.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

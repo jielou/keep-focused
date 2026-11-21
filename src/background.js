@@ -1,15 +1,20 @@
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+importScripts("schedule.js");
 const DEFAULT_SETTINGS = {
   enabled: true,
   sessionWindowMinutes: 15,
-  focusDurationMinutes: 30
+  focusDurationMinutes: 30,
+  maxOpenTabs: null
 };
 
 chrome.runtime.onInstalled.addListener(async () => {
   const data = await chrome.storage.local.get(["settings", "rules", "usage", "sessionStats", "focus"]);
   const updates = {};
 
-  if (!data.settings || !Number.isFinite(Number(data.settings.focusDurationMinutes))) {
+  if (
+    !data.settings
+    || !Number.isFinite(Number(data.settings.focusDurationMinutes))
+    || !Object.prototype.hasOwnProperty.call(data.settings, "maxOpenTabs")
+  ) {
     updates.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
   }
   if (!Array.isArray(data.rules)) updates.rules = [];
@@ -97,7 +102,9 @@ async function evaluateNavigation(url) {
         domain: hostname,
         reason: "schedule",
         rule,
-        availableAt: nextAvailableTime(rule, now, nextReset)
+        availableAt: RuleSchedule.availableAt((rules || []).filter(candidate =>
+          candidate.enabled !== false && Number(candidate.dailyLimit) === 0
+          && domainMatches(candidate, hostname)), now)
       };
     }
   }
@@ -197,25 +204,7 @@ function domainMatches(rule, hostname) {
 }
 
 function ruleAppliesNow(rule, now) {
-  const dayName = DAY_NAMES[now.getDay()];
-  const days = Array.isArray(rule.days) ? rule.days : [];
-  if (days.length > 0 && !days.includes(dayName)) return false;
-  if (!rule.timeWindow || rule.timeWindow.mode !== "custom") return true;
-
-  const current = now.getHours() * 60 + now.getMinutes();
-  const start = minutesFromTime(rule.timeWindow.start);
-  const end = minutesFromTime(rule.timeWindow.end);
-
-  if (start === null || end === null || start === end) return true;
-  if (start < end) return current >= start && current < end;
-  return current >= start || current < end;
-}
-
-function minutesFromTime(value) {
-  if (!/^\d{2}:\d{2}$/.test(value || "")) return null;
-  const [hours, minutes] = value.split(":").map(Number);
-  if (hours > 23 || minutes > 59) return null;
-  return hours * 60 + minutes;
+  return RuleSchedule.applies(rule, now);
 }
 
 function dateKey(date) {
@@ -223,25 +212,6 @@ function dateKey(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function nextAvailableTime(rule, now, fallback) {
-  if (!rule.timeWindow || rule.timeWindow.mode !== "custom") {
-    return fallback.toISOString();
-  }
-
-  const end = minutesFromTime(rule.timeWindow.end);
-  if (end === null) return fallback.toISOString();
-
-  const current = now.getHours() * 60 + now.getMinutes();
-  const endDate = new Date(now);
-
-  if (end <= current) {
-    endDate.setDate(endDate.getDate() + 1);
-  }
-
-  endDate.setHours(Math.floor(end / 60), end % 60, 0, 0);
-  return endDate.toISOString();
 }
 
 const FOCUS_END_ALARM_NAME = "keep-focused-end";
@@ -422,4 +392,122 @@ chrome.tabs.onRemoved.addListener(async tabId => {
   }
 });
 
+let tabLimitQueue = Promise.resolve();
+let tabLimitNotificationId = 0;
+
+chrome.tabs.onCreated.addListener(tab => {
+  // Handle tab creations one at a time so rapidly opening several tabs cannot bypass the limit.
+  tabLimitQueue = tabLimitQueue
+    .then(() => enforceTabLimit(tab))
+    .catch(error => console.error("[Keep Focused] tab-limit error", error));
+});
+
+function sanitizeMaxOpenTabs(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const limit = Number(value);
+  if (!Number.isFinite(limit)) return null;
+  return Math.max(1, Math.min(500, Math.floor(limit)));
+}
+
+async function enforceTabLimit(newTab) {
+  if (!newTab.id || newTab.incognito) return;
+
+  const window = await chrome.windows.get(newTab.windowId).catch(() => null);
+  if (!window || window.type !== "normal" || window.incognito) return;
+
+  const { settings } = await chrome.storage.local.get(["settings"]);
+  const maxOpenTabs = sanitizeMaxOpenTabs(settings?.maxOpenTabs);
+  if (maxOpenTabs === null) return;
+
+  const windows = await chrome.windows.getAll({ populate: true, windowTypes: ["normal"] });
+  const openTabs = windows.flatMap(browserWindow =>
+    (browserWindow.tabs || []).filter(tab => !tab.incognito)
+  );
+
+  if (!openTabs.some(tab => tab.id === newTab.id)) return;
+
+  if (openTabs.length === maxOpenTabs) {
+    await notifyTabLimit(
+      `You have reached your tab limit (${maxOpenTabs}). Opening another tab will be blocked.`
+    );
+    return;
+  }
+
+  if (openTabs.length < maxOpenTabs) return;
+
+  try {
+    await chrome.tabs.remove(newTab.id);
+  } catch {
+    return;
+  }
+
+  await notifyTabLimit(`Tab limit reached (${maxOpenTabs}). Close a tab before opening another one.`);
+}
+
+async function notifyTabLimit(message) {
+  await chrome.notifications.create(`tab-limit-${Date.now()}-${++tabLimitNotificationId}`, {
+    type: "basic",
+    iconUrl: chrome.runtime.getURL("icons/keep_focused_icon_128.png"),
+    title: "Keep Focused",
+    message
+  });
+}
+
 syncFocusAlarm();
+
+// Exact boundaries handle normal operation; the watchdog catches clock/timezone changes
+// and missed alarms after sleep. Scanning tabs never consumes checking sessions.
+const SCHEDULE_ALARM = "keep-focused-schedule";
+const SCHEDULE_WATCHDOG = "keep-focused-schedule-watchdog";
+let scheduleQueue = Promise.resolve();
+
+function refreshSchedule() {
+  scheduleQueue = scheduleQueue.then(async () => {
+    const { rules = [], settings } = await chrome.storage.local.get(["rules", "settings"]);
+    const blocks = settings?.enabled === false ? [] : rules.filter(rule =>
+      rule.enabled !== false && Number(rule.dailyLimit) === 0
+    );
+    await chrome.alarms.clear(SCHEDULE_ALARM);
+    if (!blocks.length) {
+      await chrome.alarms.clear(SCHEDULE_WATCHDOG);
+      return;
+    }
+    if (!await chrome.alarms.get(SCHEDULE_WATCHDOG)) {
+      await chrome.alarms.create(SCHEDULE_WATCHDOG, { periodInMinutes: 1 });
+    }
+    const now = new Date();
+    const next = RuleSchedule.boundaries(blocks, now)[0];
+    if (next) await chrome.alarms.create(SCHEDULE_ALARM, { when: next });
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      const url = safeUrl(tab.pendingUrl || tab.url);
+      if (!url || !["http:", "https:"].includes(url.protocol)) continue;
+      const hostname = normalizeHostname(url.hostname);
+      const matching = blocks.filter(rule => domainMatches(rule, hostname));
+      const rule = matching.find(rule => ruleAppliesNow(rule, now));
+      if (!rule) continue;
+      try {
+        // Avoid replacing a page the user navigated away from during this scan.
+        const current = await chrome.tabs.get(tab.id);
+        if ((current.pendingUrl || current.url) !== (tab.pendingUrl || tab.url)) continue;
+        await redirectToBlocked(tab.id, {
+          domain: hostname, reason: "schedule", rule,
+          availableAt: RuleSchedule.availableAt(matching, now)
+        });
+      } catch {
+        // A tab may close while it is being checked.
+      }
+    }
+  }).catch(error => console.error("[Keep Focused] schedule error", error));
+  return scheduleQueue;
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && (changes.rules || changes.settings)) refreshSchedule();
+});
+chrome.alarms.onAlarm.addListener(alarm => {
+  if ([SCHEDULE_ALARM, SCHEDULE_WATCHDOG].includes(alarm.name)) return refreshSchedule();
+});
+chrome.runtime.onStartup.addListener(refreshSchedule);
+refreshSchedule();

@@ -2,8 +2,9 @@
   "manifest_version": 3,
   "name": "Keep Focused",
   "description": "Block distracting domains during chosen days and limit daily checking sessions.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "permissions": ["storage", "tabs", "webNavigation", "alarms", "notifications"],
+  "optional_permissions": ["history"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background.js"

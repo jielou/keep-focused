@@ -2,7 +2,8 @@ const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_SETTINGS = {
   enabled: true,
   sessionWindowMinutes: 15,
-  focusDurationMinutes: 30
+  focusDurationMinutes: 30,
+  maxOpenTabs: null
 };
 
 const PALETTE = [
@@ -28,11 +29,19 @@ const state = {
 
 const form = document.querySelector("#ruleForm");
 const domainInput = document.querySelector("#domainInput");
+const loadDomainSuggestions = document.querySelector("#loadDomainSuggestions");
+const domainSuggestionsStatus = document.querySelector("#domainSuggestionsStatus");
+const domainSuggestionsList = document.querySelector("#domainSuggestionsList");
+let suggestionsRequestId = 0;
+let watchingHistoryRemovals = false;
 const limitInput = document.querySelector("#limitInput");
+const limitField = document.querySelector("#limitField");
+const scheduleSummary = document.querySelector("#scheduleSummary");
 const includeSubdomainsInput = document.querySelector("#includeSubdomainsInput");
 const masterEnabled = document.querySelector("#masterEnabled");
 const sessionWindowInput = document.querySelector("#sessionWindowInput");
 const focusDurationInput = document.querySelector("#focusDurationInput");
+const maxOpenTabsInput = document.querySelector("#maxOpenTabsInput");
 const rulesList = document.querySelector("#rulesList");
 const activeRulesList = document.querySelector("#activeRulesList");
 const saveRule = document.querySelector("#saveRule");
@@ -55,6 +64,9 @@ init();
 checkPermissions();
 setupSidebar();
 setupFaviconFallback();
+updateScheduleForm();
+// Keep the dashboard current as the clock crosses schedule boundaries.
+setInterval(renderActiveRules, 30_000);
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
@@ -83,6 +95,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     masterEnabled.checked = state.settings.enabled;
     sessionWindowInput.value = state.settings.sessionWindowMinutes;
     focusDurationInput.value = state.settings.focusDurationMinutes;
+    maxOpenTabsInput.value = displayMaxOpenTabs(state.settings.maxOpenTabs);
+    rulesChanged = true;
   }
 
   if (rulesChanged) {
@@ -101,9 +115,75 @@ async function init() {
   masterEnabled.checked = state.settings.enabled;
   sessionWindowInput.value = state.settings.sessionWindowMinutes;
   focusDurationInput.value = state.settings.focusDurationMinutes;
+  maxOpenTabsInput.value = displayMaxOpenTabs(state.settings.maxOpenTabs);
   renderActiveRules();
   renderRules();
   renderStats();
+}
+
+loadDomainSuggestions.addEventListener("click", async () => {
+  const requestId = ++suggestionsRequestId;
+  loadDomainSuggestions.disabled = true;
+  domainSuggestionsList.replaceChildren();
+  domainSuggestionsStatus.textContent = "Waiting for history permission…";
+  try {
+    // Keep the permission request directly inside the click gesture.
+    const granted = await chrome.permissions.request({ permissions: ["history"] });
+    if (requestId !== suggestionsRequestId) return;
+    if (!granted) {
+      domainSuggestionsStatus.textContent = "History access was not granted. You can still enter any domain above.";
+      return;
+    }
+    watchHistoryRemovals();
+    domainSuggestionsStatus.textContent = "Counting visits in the last 7 days…";
+    const result = await DomainSuggestions.load(chrome.history);
+    if (requestId !== suggestionsRequestId) return;
+    for (const { domain, count } of result.domains.slice(0, 10)) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "suggested-domain ghost";
+      button.dataset.domain = domain;
+      const name = document.createElement("span");
+      name.textContent = domain;
+      const visits = document.createElement("small");
+      visits.textContent = `${count} ${count === 1 ? "visit" : "visits"}`;
+      button.append(name, visits);
+      domainSuggestionsList.append(button);
+    }
+    domainSuggestionsStatus.textContent = !result.domains.length
+      ? "No website visits found in the last 7 days. You can enter a domain above."
+      : `${result.truncated ? "Partial ranking: limited to 10,000 history URLs. " : ""}Top ${Math.min(10, result.domains.length)} domains · last 7 × 24 hours. Counts page visits, including reloads, not time spent. Click a domain to use it.`;
+    loadDomainSuggestions.textContent = "Refresh · last 7 days";
+  } catch (error) {
+    if (requestId !== suggestionsRequestId) return;
+    domainSuggestionsStatus.textContent = "Could not read Chrome history. Try again, or enter a domain above.";
+  } finally {
+    if (requestId === suggestionsRequestId) loadDomainSuggestions.disabled = false;
+  }
+});
+
+domainSuggestionsList.addEventListener("click", event => {
+  const button = event.target.closest("button[data-domain]");
+  if (!button) return;
+  domainInput.value = button.dataset.domain;
+  domainInput.setCustomValidity("");
+  updateScheduleForm();
+  domainInput.focus();
+});
+
+function clearDomainSuggestions() {
+  suggestionsRequestId++;
+  domainSuggestionsList.replaceChildren();
+  loadDomainSuggestions.disabled = false;
+  domainSuggestionsStatus.textContent = "History access or records changed. Click Show / Refresh to update suggestions.";
+}
+chrome.permissions?.onRemoved?.addListener(permissions => {
+  if (permissions.permissions?.includes("history")) clearDomainSuggestions();
+});
+function watchHistoryRemovals() {
+  if (watchingHistoryRemovals || !chrome.history?.onVisitRemoved) return;
+  chrome.history.onVisitRemoved.addListener(clearDomainSuggestions);
+  watchingHistoryRemovals = true;
 }
 
 form.addEventListener("submit", async event => {
@@ -120,7 +200,19 @@ form.addEventListener("submit", async event => {
   const selectedDays = [...form.querySelectorAll("input[name='days']:checked")]
     .map(input => input.value);
 
+  const firstDay = form.querySelector("input[name='days']");
+  firstDay.setCustomValidity(selectedDays.length ? "" : "Choose at least one day.");
+  if (!selectedDays.length) {
+    firstDay.reportValidity();
+    return;
+  }
   const timeMode = form.querySelector("input[name='timeMode']:checked").value;
+  if (timeMode === "custom") {
+    endTime.setCustomValidity(startTime.value === endTime.value
+      ? "Choose different start and end times, or select All day." : "");
+    if (!form.reportValidity()) return;
+  }
+  const existing = state.rules.find(rule => rule.id === state.editingId);
   const rule = {
     id: state.editingId || crypto.randomUUID(),
     domain,
@@ -129,8 +221,9 @@ form.addEventListener("submit", async event => {
     timeWindow: timeMode === "custom"
       ? { mode: "custom", start: startTime.value, end: endTime.value }
       : { mode: "allDay" },
-    dailyLimit: Math.max(0, Number(limitInput.value)),
-    enabled: true,
+    dailyLimit: form.querySelector("input[name='ruleMode']:checked").value === "block"
+      ? 0 : Math.max(1, Number(limitInput.value)),
+    enabled: existing?.enabled !== false,
     updatedAt: Date.now()
   };
 
@@ -171,6 +264,25 @@ focusDurationInput.addEventListener("change", async () => {
   await chrome.storage.local.set({ settings: state.settings });
 });
 
+maxOpenTabsInput.addEventListener("change", async () => {
+  const maxOpenTabs = sanitizeMaxOpenTabs(maxOpenTabsInput.value);
+  maxOpenTabsInput.value = displayMaxOpenTabs(maxOpenTabs);
+  state.settings = { ...state.settings, maxOpenTabs };
+  await chrome.storage.local.set({ settings: state.settings });
+});
+
+function sanitizeMaxOpenTabs(value) {
+  if (value.trim() === "") return null;
+
+  const maxOpenTabs = Number(value);
+  if (!Number.isFinite(maxOpenTabs)) return null;
+  return Math.max(1, Math.min(500, Math.floor(maxOpenTabs)));
+}
+
+function displayMaxOpenTabs(value) {
+  return Number.isFinite(Number(value)) && Number(value) > 0 ? Math.floor(Number(value)) : "";
+}
+
 cancelEdit.addEventListener("click", () => {
   resetForm();
   setActiveNav("settings");
@@ -186,11 +298,41 @@ resetUsage.addEventListener("click", async () => {
   renderStats();
 });
 
-form.addEventListener("change", event => {
-  if (event.target.name === "timeMode") {
-    customTimes.classList.toggle("hidden", event.target.value !== "custom");
-  }
+form.addEventListener("input", () => {
+  domainInput.setCustomValidity("");
+  form.querySelector("input[name='days']").setCustomValidity("");
+  endTime.setCustomValidity("");
+  updateScheduleForm();
 });
+
+form.addEventListener("click", event => {
+  const button = event.target.closest("button[data-days]");
+  if (!button) return;
+  const selected = button.dataset.days === "weekdays" ? DAY_LABELS.slice(0, 5)
+    : button.dataset.days === "weekends" ? DAY_LABELS.slice(5) : DAY_LABELS;
+  for (const input of form.querySelectorAll("input[name='days']")) {
+    input.checked = selected.includes(input.value);
+    input.setCustomValidity("");
+  }
+  updateScheduleForm();
+});
+
+function updateScheduleForm() {
+  const block = form.querySelector("input[name='ruleMode']:checked").value === "block";
+  const custom = form.querySelector("input[name='timeMode']:checked").value === "custom";
+  limitField.classList.toggle("hidden", block);
+  limitInput.disabled = block;
+  customTimes.classList.toggle("hidden", !custom);
+  startTime.disabled = endTime.disabled = !custom;
+  startTime.required = endTime.required = custom;
+  const selected = [...form.querySelectorAll("input[name='days']:checked")].map(input => input.value);
+  const days = selected.length === 7 ? "Every day" : selected.join(", ") || "Choose days";
+  const overnight = startTime.value > endTime.value ? " (ends next day)" : "";
+  const time = custom ? `${startTime.value}–${endTime.value}${overnight}` : "all day";
+  scheduleSummary.textContent = block
+    ? `Block ${domainInput.value.trim() || "this domain"} · ${days} · ${time}. No sessions allowed during this schedule.`
+    : `Allow ${limitInput.value} sessions per day · ${days} · ${time}. Outside this schedule, access is unrestricted unless another rule applies.`;
+}
 
 rulesList.addEventListener("click", async event => {
   const button = event.target.closest("button[data-action]");
@@ -230,9 +372,9 @@ function renderActiveRules() {
   activeRulesList.replaceChildren();
 
   const now = new Date();
-  const activeRules = state.rules.filter(rule =>
+  const activeRules = state.settings.enabled ? state.rules.filter(rule =>
     rule.enabled !== false && ruleAppliesNow(rule, now)
-  );
+  ) : [];
 
   if (activeRules.length === 0) {
     activeRulesList.innerHTML = `
@@ -250,7 +392,7 @@ function renderActiveRules() {
     const usage = state.usage[today]?.[rule.id]?.count || 0;
     const limit = Number(rule.dailyLimit);
     const timeText = rule.timeWindow?.mode === "custom"
-      ? `${rule.timeWindow.start}-${rule.timeWindow.end}`
+      ? `${rule.timeWindow.start}–${rule.timeWindow.end}${rule.timeWindow.start > rule.timeWindow.end ? " (+1 day)" : ""}`
       : "all day";
 
     const card = document.createElement("article");
@@ -321,11 +463,12 @@ function renderRules() {
 
   for (const rule of state.rules) {
     const usage = state.usage[today]?.[rule.id]?.count || 0;
-    const limitText = Number(rule.dailyLimit) === 0
+    const isTimeBlock = Number(rule.dailyLimit) === 0;
+    const limitText = isTimeBlock
       ? "full block"
       : `${usage}/${rule.dailyLimit} sessions today`;
     const timeText = rule.timeWindow?.mode === "custom"
-      ? `${rule.timeWindow.start}-${rule.timeWindow.end}`
+      ? `${rule.timeWindow.start}–${rule.timeWindow.end}${rule.timeWindow.start > rule.timeWindow.end ? " (+1 day)" : ""}`
       : "all day";
     const daysText = rule.days?.length ? rule.days.join(", ") : "every day";
 
@@ -334,7 +477,10 @@ function renderRules() {
     card.innerHTML = `
       ${siteIcon(rule.domain)}
       <div class="rule-main">
-        <h3>${escapeHtml(rule.domain)}</h3>
+        <div class="rule-heading">
+          <h3>${escapeHtml(rule.domain)}</h3>
+          <span class="rule-type ${isTimeBlock ? "rule-type-time" : "rule-type-session"}">${isTimeBlock ? "Time block" : "Session limit"}</span>
+        </div>
         <div class="rule-meta">
           <span class="pill">${escapeHtml(daysText)}</span>
           <span class="pill">${escapeHtml(timeText)}</span>
@@ -580,19 +726,22 @@ function formatFullMonthDate(date) {
 function populateForm(rule) {
   state.editingId = rule.id;
   domainInput.value = rule.domain;
-  limitInput.value = rule.dailyLimit;
+  const block = Number(rule.dailyLimit) === 0;
+  form.querySelector(`input[name='ruleMode'][value='${block ? "block" : "limit"}']`).checked = true;
+  limitInput.value = block ? 5 : rule.dailyLimit;
   includeSubdomainsInput.checked = rule.includeSubdomains !== false;
 
   for (const input of form.querySelectorAll("input[name='days']")) {
-    input.checked = (rule.days || []).includes(input.value);
+    input.checked = !rule.days?.length || rule.days.includes(input.value);
   }
 
   const isCustom = rule.timeWindow?.mode === "custom";
   form.querySelector(`input[name='timeMode'][value='${isCustom ? "custom" : "allDay"}']`).checked = true;
   customTimes.classList.toggle("hidden", !isCustom);
-  startTime.value = rule.timeWindow?.start || "09:00";
+  startTime.value = rule.timeWindow?.start || "08:00";
   endTime.value = rule.timeWindow?.end || "17:00";
 
+  updateScheduleForm();
   saveRule.textContent = "Save rule";
   cancelEdit.classList.remove("hidden");
   document.querySelector("#editorTitle").textContent = "Edit rule";
@@ -607,8 +756,8 @@ function resetForm() {
   for (const input of form.querySelectorAll("input[name='days']")) {
     input.checked = ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(input.value);
   }
-  form.querySelector("input[name='timeMode'][value='allDay']").checked = true;
-  customTimes.classList.add("hidden");
+  for (const input of form.querySelectorAll("input")) input.setCustomValidity("");
+  updateScheduleForm();
   saveRule.textContent = "Add rule";
   cancelEdit.classList.add("hidden");
   document.querySelector("#editorTitle").textContent = "Add a rule";
@@ -635,29 +784,8 @@ function localDateKey(date) {
   ].join("-");
 }
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 function ruleAppliesNow(rule, now) {
-  const dayName = DAY_NAMES[now.getDay()];
-  const days = Array.isArray(rule.days) ? rule.days : [];
-  if (days.length > 0 && !days.includes(dayName)) return false;
-
-  if (!rule.timeWindow || rule.timeWindow.mode !== "custom") return true;
-
-  const current = now.getHours() * 60 + now.getMinutes();
-  const start = minutesFromTime(rule.timeWindow.start);
-  const end = minutesFromTime(rule.timeWindow.end);
-
-  if (start === null || end === null || start === end) return true;
-  if (start < end) return current >= start && current < end;
-  return current >= start || current < end;
-}
-
-function minutesFromTime(value) {
-  if (!/^\d{2}:\d{2}$/.test(value || "")) return null;
-  const [hours, minutes] = value.split(":").map(Number);
-  if (hours > 23 || minutes > 59) return null;
-  return hours * 60 + minutes;
+  return RuleSchedule.applies(rule, now);
 }
 
 function escapeHtml(value) {
